@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安静位 (Resting Position) 計算ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Noto Sans JP', sans-serif; 
+        }
+        /* カスタムスライダーのスタイル */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 4px solid #10b981;
+            cursor: pointer;
+            margin-top: -12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #e5e7eb;
+            border-radius: 3px;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 4px solid #10b981;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #e5e7eb;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 p-3 sm:p-4 md:p-6 text-slate-800">
+
+    <div class="max-w-4xl mx-auto bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+        
+        <!-- Header -->
+        <div class="bg-slate-900 p-4 sm:p-6 text-white">
+            <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2 sm:gap-3 flex-wrap">
+                <!-- Calculator アイコン（SVG） -->
+                <svg class="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span class="flex-1 min-w-0">安静位 (Resting Position) 計算ツール</span>
+            </h1>
+            <p class="text-slate-400 text-xs sm:text-sm mt-1">拘縮のある人の外転角度から、介入時の角度（内外旋中間位）を算出</p>
+            <p class="text-slate-500 text-xs mt-1">Ar-Tyan Hsuらの研究(2002)に基づく回帰式: Y = 0.607X - 13.120</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="p-4 sm:p-6 md:p-8 bg-slate-100">
+            <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm">
+                <div class="mb-4 sm:mb-6">
+                    <label class="block text-base sm:text-lg font-bold text-slate-700 mb-2">
+                        Q. 患者さんの肩は最大で何度まで開きますか？(肩甲骨面上での最大挙上可動域)
+                    </label>
+                    <p class="text-xs text-slate-500 mb-3 sm:mb-4">※ 拘縮のある患者さんの最大外転角度（GH Scaption）を入力してください</p>
+                    <div class="flex items-center gap-3 sm:gap-4">
+                        <input 
+                            type="range" 
+                            id="romSlider"
+                            min="30" 
+                            max="120" 
+                            value="60" 
+                            class="flex-1 h-4 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                        />
+                        <span id="romDisplay" class="text-2xl sm:text-3xl font-bold text-emerald-600 w-20 sm:w-24 text-center flex-shrink-0">60°</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-400 mt-2 px-2">
+                        <span>30° (ガチガチ)</span>
+                        <span>120° (柔らかい)</span>
+                    </div>
+                </div>
+
+                <!-- Visual Display Area -->
+                <div class="mt-4 sm:mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                    <!-- Left: Visual Representation -->
+                    <div class="bg-white rounded-xl p-3 sm:p-4 border border-slate-200">
+                        <h3 class="text-xs sm:text-sm font-bold text-slate-700 mb-1 sm:mb-2">角度の視覚化（肩甲骨面上）</h3>
+                        <p class="text-xs text-slate-500 mb-3 sm:mb-4">灰色：最大可動域 / 緑色：介入時の角度（内外旋中間位）</p>
+                        <svg 
+                            id="angleVisualization"
+                            viewBox="0 0 550 400" 
+                            class="w-full h-auto"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <!-- 背景 -->
+                            <rect width="550" height="400" fill="#ffffff" />
+                            
+                            <!-- 座標系の原点（体幹の位置） -->
+                            <g transform="translate(100, 350) scale(1, -1)">
+                                <!-- 座標軸 -->
+                                <line x1="0" y1="0" x2="350" y2="0" stroke="#cbd5e1" stroke-width="3" />
+                                <line x1="0" y1="0" x2="0" y2="300" stroke="#cbd5e1" stroke-width="3" />
+                                
+                                <!-- 原点の円 -->
+                                <circle cx="0" cy="0" r="22" fill="#064e3b" />
+                                
+                                <!-- 最大可動域の線（薄いグレー） -->
+                                <g id="maxRomGroup" transform="rotate(60, 0, 0)">
+                                    <line x1="0" y1="0" x2="280" y2="0" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round" />
+                                </g>
+                                
+                                <!-- 安静位の線（明るい緑） -->
+                                <g id="restingPosGroup" transform="rotate(23.3, 0, 0)">
+                                    <line x1="0" y1="0" x2="260" y2="0" stroke="#10b981" stroke-width="5" stroke-linecap="round" />
+                                </g>
+                                
+                                <!-- 体幹のラベル -->
+                                <text x="380" y="0" transform="scale(1, -1)" fill="#64748b" font-size="14" alignment-baseline="middle">体幹</text>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <!-- Right: Result Panel -->
+                    <div class="bg-emerald-50 rounded-xl p-4 sm:p-6 border border-emerald-200">
+                        <h2 class="text-base sm:text-lg font-bold text-emerald-800 mb-1">介入時の角度（内外旋中間位）</h2>
+                        <p class="text-xs text-emerald-600 mb-1 sm:mb-2">関節包が最もリラックスした位置（安静位）</p>
+                        <p class="text-xs text-emerald-600 mb-3 sm:mb-4">組織へのストレスが最小化され、組織修復に有利な角度</p>
+                        
+                        <div class="border-t border-emerald-200 my-3"></div>
+
+                        <div class="space-y-3 sm:space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-emerald-700 text-sm sm:text-base">最大挙上可動域:</span>
+                                <span id="resultMaxRom" class="font-bold text-emerald-800 text-xl sm:text-2xl">60°</span>
+                            </div>
+                            
+                            <div class="flex flex-col">
+                                <span class="text-xs sm:text-sm text-emerald-700 mb-2 font-bold">推奨される介入角度（GH Scaption）:</span>
+                                <div class="text-4xl sm:text-5xl md:text-6xl font-bold text-emerald-600">
+                                    <span id="resultRestingPos">23.3</span><span class="text-2xl sm:text-3xl">°</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 sm:mt-6 text-xs text-emerald-600 bg-white/50 p-2 sm:p-3 rounded space-y-1">
+                            <p class="font-semibold">※ この角度から介入を開始することで：</p>
+                            <p>・関節包へのストレスが最小限</p>
+                            <p>・夜間痛の軽減や拘縮予防が期待できます</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 要素の取得
+        const romSlider = document.getElementById('romSlider');
+        const romDisplay = document.getElementById('romDisplay');
+        const resultMaxRom = document.getElementById('resultMaxRom');
+        const resultRestingPos = document.getElementById('resultRestingPos');
+        const maxRomGroup = document.getElementById('maxRomGroup');
+        const restingPosGroup = document.getElementById('restingPosGroup');
+
+        // 安静位の計算ロジック（Y = 0.607X - 13.120）
+        function calculateRestingPosition(x) {
+            const y = 0.607 * x - 13.120;
+            return y > 0 ? parseFloat(y.toFixed(1)) : 0;
+        }
+
+        // スライダー更新関数
+        function updateCalculator() {
+            const maxRom = parseInt(romSlider.value);
+            const restingPos = calculateRestingPosition(maxRom);
+
+            // 数値表示の更新
+            romDisplay.textContent = maxRom + '°';
+            resultMaxRom.textContent = maxRom + '°';
+            resultRestingPos.textContent = restingPos;
+
+            // SVGの角度を更新
+            // 最大可動域の線を回転
+            maxRomGroup.setAttribute('transform', `rotate(${maxRom}, 0, 0)`);
+
+            // 安静位の線を回転
+            restingPosGroup.setAttribute('transform', `rotate(${restingPos}, 0, 0)`);
+        }
+
+        // イベントリスナー設定
+        romSlider.addEventListener('input', updateCalculator);
+
+        // 初期化
+        updateCalculator();
+    </script>
+</body>
+</html>
